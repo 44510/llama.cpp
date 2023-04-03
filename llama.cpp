@@ -327,6 +327,11 @@ static void *mmap_file(const char *fname, uint64_t *mm_length) {
     void *addr = MapViewOfFile(hMapping, FILE_MAP_READ, 0, 0, 0);
     CloseHandle(hMapping);
     if (!addr) return 0;
+    // Advise the kernel to preload the mapped memory
+    WIN32_MEMORY_RANGE_ENTRY range;
+    range.VirtualAddress = addr;
+    range.NumberOfBytes = (SIZE_T)length;
+    PrefetchVirtualMemory(GetCurrentProcess(), 1, &range, 0);
 #else
     int fd = open(fname, O_RDONLY);
     if (fd == -1) return 0;
@@ -334,6 +339,8 @@ static void *mmap_file(const char *fname, uint64_t *mm_length) {
     void *addr = mmap(NULL, length, PROT_READ, MAP_SHARED, fd, 0);
     close(fd);
     if (addr == MAP_FAILED) return 0;
+    // Advise the kernel to preload the mapped memory
+    madvise(addr, length, MADV_WILLNEED);
 #endif
     *mm_length = length;
     return addr;
